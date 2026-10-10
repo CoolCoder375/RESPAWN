@@ -4,3 +4,4 @@ dist
 package-lock.json
 PLAN.md
 supabase/.temp
+src/lib/database.types.ts

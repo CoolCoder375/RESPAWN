@@ -11,6 +11,6 @@ Follow PLAN.md. Build one milestone at a time, stop after each one, and list wha
 - Every table has RLS on. Users never write `profiles.pair_id` directly (column grants block it).
 - "Today" is the user's local day from `profiles.timezone` (`src/lib/dates.ts`), computed on the client.
 - Secrets (Gemini key, service role key) only via `supabase secrets set`, never `EXPO_PUBLIC_*`.
-- Run the Supabase CLI as `npx supabase ...`.
+- Run the Supabase CLI as `npx supabase ...`. After pushing a migration: `npm run gen:types`, then rerun `supabase/tests/rls_check.sql` (extend it for new tables).
 - Before calling a task done: `npm run lint` and `npm run typecheck`.
 - Record notable design choices in DECISIONS.md.

@@ -7,7 +7,7 @@ Built with Expo (React Native, TypeScript, Expo Router), TanStack Query and Supa
 ## Status
 
 - [x] Milestone 1 – Skeleton: tabs, theme, fonts, Supabase client, email OTP sign-in, onboarding
-- [ ] Milestone 2 – Database
+- [x] Milestone 2 – Database: schema, RLS, pairing functions, RLS test
 - [ ] Milestone 3 – Today tab
 - [ ] Milestone 4 – Thought tab
 - [ ] Milestone 5 – Duo tab
@@ -28,12 +28,14 @@ Built with Expo (React Native, TypeScript, Expo Router), TanStack Query and Supa
 
 ## Scripts
 
-| Command | What it does |
-| --- | --- |
-| `npm start` | Start the Expo dev server |
-| `npm run lint` | ESLint (expo config + prettier) |
-| `npm run typecheck` | `tsc --noEmit` |
-| `npm run format` | Prettier |
+| Command                                                          | What it does                                                   |
+| ---------------------------------------------------------------- | -------------------------------------------------------------- |
+| `npm start`                                                      | Start the Expo dev server                                      |
+| `npm run lint`                                                   | ESLint (expo config + prettier)                                |
+| `npm run typecheck`                                              | `tsc --noEmit`                                                 |
+| `npm run format`                                                 | Prettier                                                       |
+| `npm run gen:types`                                              | Regenerate `src/lib/database.types.ts` from the linked project |
+| `npx supabase db query --linked -f supabase/tests/rls_check.sql` | Run the RLS checks (rolls back; prints `RLS CHECK PASSED`)     |
 
 ## Structure
 

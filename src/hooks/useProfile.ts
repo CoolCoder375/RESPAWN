@@ -1,16 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '@/lib/auth';
+import type { Tables } from '@/lib/database.types';
 import { supabase } from '@/lib/supabase';
 
-export type Profile = {
-  id: string;
-  display_name: string;
-  season_start: string; // YYYY-MM-DD
-  timezone: string;
-  pair_id: string | null;
-  created_at: string;
-};
+/** season_start is a "YYYY-MM-DD" local day. */
+export type Profile = Tables<'profiles'>;
 
 export type ProfileInput = Pick<Profile, 'display_name' | 'season_start' | 'timezone'>;
 

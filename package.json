@@ -39,7 +39,8 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "gen:types": "supabase gen types typescript --linked --schema public > src/lib/database.types.ts"
   },
   "private": true
 }
