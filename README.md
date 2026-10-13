@@ -8,7 +8,7 @@ Built with Expo (React Native, TypeScript, Expo Router), TanStack Query and Supa
 
 - [x] Milestone 1 – Skeleton: tabs, theme, fonts, Supabase client, email OTP sign-in, onboarding
 - [x] Milestone 2 – Database: schema, RLS, pairing functions, RLS test
-- [ ] Milestone 3 – Today tab
+- [x] Milestone 3 – Today tab: tasks, daily/one-off, Respawn Points (priority), per-day ticks, Day X of 60 run with reset, streak
 - [ ] Milestone 4 – Thought tab
 - [ ] Milestone 5 – Duo tab
 - [ ] Milestone 6 – Coach tab

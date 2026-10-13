@@ -25,6 +25,8 @@ declare
   b uuid := gen_random_uuid();
   c uuid := gen_random_uuid();
   task_a uuid;
+  high_c uuid;
+  low_c uuid;
   today date := (now() at time zone 'utc')::date;
   invite_code text;
   n integer;
@@ -38,7 +40,7 @@ begin
          (b, b || '@rls.test', 'authenticated', 'authenticated'),
          (c, c || '@rls.test', 'authenticated', 'authenticated');
   insert into public.profiles (id, display_name, timezone)
-  values (a, 'A', 'Asia/Kolkata'), (b, 'B', 'Asia/Kolkata'), (c, 'C', 'UTC');
+  values (a, 'A', 'UTC'), (b, 'B', 'Asia/Kolkata'), (c, 'C', 'UTC');
   insert into public.tasks (user_id, title, kind) values (a, 'A task', 'daily') returning id into task_a;
   insert into public.task_completions (task_id, user_id, day) values (task_a, a, today);
   insert into public.coach_messages (user_id, role, content) values (a, 'user', 'private chat');
@@ -128,6 +130,12 @@ begin
   select count(*) into n from public.tasks where user_id = a;
   if n = 0 then passed := passed + 1; else failures := failures || 'stranger C can read A tasks'; end if;
 
+  -- Run: partner sees A's (1, all RP ticked today), stranger gets 0.
+  perform pg_temp.act_as(b);
+  if public.run_length(a, today) = 1 then passed := passed + 1; else failures := failures || 'partner B cannot see A run'; end if;
+  perform pg_temp.act_as(c);
+  if public.run_length(a, today) = 0 then passed := passed + 1; else failures := failures || 'stranger C sees A run'; end if;
+
   -- 4. Completions: own tasks only, today +/- 1 day only ----------------------
   perform pg_temp.act_as(a);
   begin
@@ -175,6 +183,53 @@ begin
   perform pg_temp.act_as(a);
   select count(*) into n from public.tasks where id = task_a;
   if n = 1 then passed := passed + 1; else failures := failures || 'A lost tasks after unpair'; end if;
+
+  -- 8. Respawn Points and the 50% rule --------------------------------------------
+  -- C (UTC) has two daily tasks from 10 days ago: High (3 RP) and Low (1 RP) -> 4 possible, need 2.
+  perform pg_temp.act_as_admin();
+  insert into public.tasks (user_id, title, kind, priority, created_at)
+    values (c, 'Gym', 'daily', 3, now() - interval '10 days') returning id into high_c;
+  insert into public.tasks (user_id, title, kind, priority, created_at)
+    values (c, 'Walk out', 'daily', 1, now() - interval '10 days') returning id into low_c;
+  -- 3 days ago: High (3/4, counts). 2 days ago: Low only (1/4, miss). Yesterday: High (counts).
+  insert into public.task_completions (task_id, user_id, day)
+    values (high_c, c, today - 3), (low_c, c, today - 2), (high_c, c, today - 1);
+
+  perform pg_temp.act_as(c);
+  n := public.run_length(c, today - 1);
+  if n = 1 then passed := passed + 1; else failures := failures || format('run after a miss: expected 1, got %s', n); end if;
+  n := public.run_length(c, today - 3);
+  if n = 1 then passed := passed + 1; else failures := failures || format('run on a counting day: expected 1, got %s', n); end if;
+
+  insert into public.task_completions (task_id, day) values (low_c, today);
+  n := public.run_length(c, today);
+  if n = 0 then passed := passed + 1; else failures := failures || format('Low only (1/4) should not count, got %s', n); end if;
+  insert into public.task_completions (task_id, day) values (high_c, today);
+  n := public.run_length(c, today);
+  if n = 2 then passed := passed + 1; else failures := failures || format('run with today: expected 2, got %s', n); end if;
+
+  -- A task added today doesn't change yesterday's verdict.
+  insert into public.tasks (title, kind, priority) values ('New high', 'daily', 3);
+  n := public.run_length(c, today - 1);
+  if n = 1 then passed := passed + 1; else failures := failures || format('new task rewrote history: got %s', n); end if;
+
+  -- Archiving sets archived_at and only affects days from now on.
+  update public.tasks set archived = true where id = low_c;
+  select count(*) into n from public.tasks where id = low_c and archived_at is not null;
+  if n = 1 then passed := passed + 1; else failures := failures || 'archived_at not set'; end if;
+  n := public.run_length(c, today - 1);
+  if n = 1 then passed := passed + 1; else failures := failures || format('archive rewrote history: got %s', n); end if;
+
+  begin
+    update public.tasks set archived_at = null where id = low_c;
+    failures := failures || 'user wrote archived_at';
+  exception when insufficient_privilege then passed := passed + 1;
+  end;
+  begin
+    insert into public.tasks (title, kind, priority) values ('Too important', 'daily', 5);
+    failures := failures || 'priority 5 accepted';
+  exception when check_violation then passed := passed + 1;
+  end;
 
   -- 7. Signed-out (anon) gets nothing ------------------------------------------
   perform pg_temp.act_as_admin();

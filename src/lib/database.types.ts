@@ -243,31 +243,37 @@ export type Database = {
       tasks: {
         Row: {
           archived: boolean
+          archived_at: string | null
           category: string | null
           created_at: string
           id: string
           kind: string
           position: number
+          priority: number
           title: string
           user_id: string
         }
         Insert: {
           archived?: boolean
+          archived_at?: string | null
           category?: string | null
           created_at?: string
           id?: string
           kind: string
           position?: number
+          priority?: number
           title: string
           user_id?: string
         }
         Update: {
           archived?: boolean
+          archived_at?: string | null
           category?: string | null
           created_at?: string
           id?: string
           kind?: string
           position?: number
+          priority?: number
           title?: string
           user_id?: string
         }
@@ -320,6 +326,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      run_length: { Args: { target: string; through: string }; Returns: number }
       unpair: { Args: never; Returns: undefined }
     }
     Enums: {

@@ -15,6 +15,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
+import { ToastProvider } from '@/components/Toast';
 import { useProfile } from '@/hooks/useProfile';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { colors, fonts, space } from '@/theme';
@@ -42,8 +43,10 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <StatusBar style="light" />
-          <AuthGate />
+          <ToastProvider>
+            <StatusBar style="light" />
+            <AuthGate />
+          </ToastProvider>
         </AuthProvider>
       </QueryClientProvider>
     </SafeAreaProvider>
