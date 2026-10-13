@@ -77,3 +77,15 @@ Each write (tick, add, edit, delete) updates the TanStack Query cache first, the
 
 A one-off is done if it has any completion. It stays in the main list on the day it's ticked (so you can untick it), then moves to the collapsible Done list from the next day.
 
+## Verse of the day from public-domain scripture
+
+The Thought tab shows one verse a day: 33 from the Bhagavad Gita and 27 from the Puranas (Bhagavatam, Vishnu, Garuda, Markandeya, Matsya), in `src/data/verses/`.
+
+- **Sanskrit** is public domain. Gita text comes from github.com/gita/gita (Unlicense); the Purana text comes from sa.wikisource.org, with its e-text typos corrected against GRETIL. The IAST transliteration is generated.
+- **English** is a plain modern rendering written for Respawn, based on a translation that is out of copyright, named in each verse's `basedOn`: Telang 1882, Wilson 1840, Dutt 1895/1908, Pargiter 1904, or Sacred Books of the Hindus 1917. The translations in the gita/gita data (Gambirananda, Sivananda and others) and Vedabase/BBT, Gita Press and Motilal are copyrighted, so none are used, even where a repo's license claims otherwise.
+- **No AI-generated verses or citations.** Every Sanskrit and source string was copied from a fetched source and spot-checked. The reflections are original writing and are labelled as such ("For today").
+- **Bundled, not fetched,** so it works offline and stays the same all day. The verse is picked by calendar day of the season (not the run's Day X), so a reset never repeats a verse. The `Verse` shape is meant to become a standalone open dataset or static JSON API later.
+
+## Saved verses stay on the device
+
+Saved verses are kept in AsyncStorage per user, by verse id, since the plan's data model has no table for them. They don't sync across devices.

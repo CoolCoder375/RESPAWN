@@ -102,6 +102,10 @@ function AuthGate() {
       <Stack.Protected guard={signedIn && hasProfile}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="settings" options={{ headerShown: true, title: 'Settings' }} />
+        <Stack.Screen
+          name="saved-thoughts"
+          options={{ headerShown: true, title: 'Saved verses' }}
+        />
       </Stack.Protected>
       <Stack.Protected guard={signedIn && !hasProfile}>
         <Stack.Screen name="(auth)/onboarding" />
