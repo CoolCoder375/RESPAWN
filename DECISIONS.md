@@ -89,3 +89,14 @@ The Thought tab shows one verse a day: 33 from the Bhagavad Gita and 27 from the
 ## Saved verses stay on the device
 
 Saved verses are kept in AsyncStorage per user, by verse id, since the plan's data model has no table for them. They don't sync across devices.
+
+## Quests replace hand-made tasks
+
+Writing your own tasks let you make the day easy whenever you wanted, so the streak meant little. Since Milestone 4.5, Respawn assigns the day's quests from a 20-question questionnaire, and they're **fully locked**: no add, edit, swap or delete. The rules are in QUESTS.md.
+
+- **Rules in Postgres, not an Edge Function.** `build_quests()` is a pure SQL/plpgsql function. `assign_quests()` and `set_quest_done()` are `security definer` and are the only way to create or tick quests. Users have no write grants on `quests`, `questionnaires`, `tasks` or `task_completions`. So the lock is enforced by the database, there's nothing to deploy, and `rls_check.sql` tests it.
+- **The server decides "today"** from `profiles.timezone`, so the client can't generate or tick another day's quests.
+- **Rule-based, not AI**, for now. It's free, works without a key, is deterministic and testable. Gemini personalisation can come in Milestone 6.
+- **The tier follows Day X**, so a reset also drops quests back to Foundation.
+- **Old tasks** were archived by migration 0005 and stay as read-only history; `run_length()` uses them for days before quests existed, so existing runs carry over.
+- **Answers are once only** in Phase 1. Retaking belongs with new seasons.

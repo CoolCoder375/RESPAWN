@@ -1,26 +1,6 @@
-// Respawn Points (RP): a task's priority is what it's worth.
-// A day counts when daily tasks worth at least half the day's possible RP are ticked.
-// Mirrors public.run_length() in supabase/migrations/0004_respawn_points.sql.
-
-export type Priority = 1 | 2 | 3;
-
-export const PRIORITIES: { value: Priority; label: string }[] = [
-  { value: 3, label: 'High' },
-  { value: 2, label: 'Medium' },
-  { value: 1, label: 'Low' },
-];
-
-/** Short labels for pickers, e.g. "High · 3". */
-export const PRIORITY_OPTIONS = PRIORITIES.map((p) => ({
-  value: p.value,
-  label: `${p.value === 2 ? 'Med' : p.label} · ${p.value}`,
-}));
-
-export const DEFAULT_PRIORITY: Priority = 2;
-
-export function asPriority(value: number): Priority {
-  return value >= 3 ? 3 : value <= 1 ? 1 : 2;
-}
+// Respawn Points (RP): every quest is worth 1–3 RP.
+// A day counts when the quests ticked are worth at least half the day's RP.
+// Mirrors public.run_length() in supabase/migrations/0005_quests.sql.
 
 export type DayScore = {
   earned: number;
@@ -30,9 +10,9 @@ export type DayScore = {
   counts: boolean;
 };
 
-export function scoreDay(dailyTasks: { priority: number; done: boolean }[]): DayScore {
-  const possible = dailyTasks.reduce((sum, t) => sum + t.priority, 0);
-  const earned = dailyTasks.reduce((sum, t) => sum + (t.done ? t.priority : 0), 0);
+export function scoreDay(quests: { rp: number; done: boolean }[]): DayScore {
+  const possible = quests.reduce((sum, q) => sum + q.rp, 0);
+  const earned = quests.reduce((sum, q) => sum + (q.done ? q.rp : 0), 0);
   return {
     earned,
     possible,

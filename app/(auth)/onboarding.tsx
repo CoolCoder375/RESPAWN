@@ -17,8 +17,8 @@ export default function Onboarding() {
           {SEASON_LENGTH} days starts on the date you pick. You can change it later in Settings.
         </AppText>
       </View>
-      {/* Saving the profile flips the auth gate, which routes to the tabs. */}
-      <ProfileForm submitLabel="Start Day 1" />
+      {/* Saving the profile flips the auth gate, which routes to the questionnaire. */}
+      <ProfileForm submitLabel="Next: 20 quick questions" />
       <Button
         title="Use a different email"
         variant="ghost"

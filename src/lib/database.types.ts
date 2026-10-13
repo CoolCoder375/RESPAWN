@@ -204,6 +204,85 @@ export type Database = {
           },
         ]
       }
+      questionnaires: {
+        Row: {
+          answers: Json
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          answers: Json
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          answers?: Json
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "questionnaires_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quests: {
+        Row: {
+          category: string
+          created_at: string
+          day: string
+          detail: string | null
+          done_at: string | null
+          id: string
+          quest_key: string
+          rp: number
+          slot: number
+          tier: number
+          title: string
+          user_id: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          day: string
+          detail?: string | null
+          done_at?: string | null
+          id?: string
+          quest_key: string
+          rp: number
+          slot: number
+          tier: number
+          title: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          day?: string
+          detail?: string | null
+          done_at?: string | null
+          id?: string
+          quest_key?: string
+          rp?: number
+          slot?: number
+          tier?: number
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_completions: {
         Row: {
           completed_at: string
@@ -292,6 +371,40 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      assign_quests: {
+        Args: never
+        Returns: {
+          category: string
+          created_at: string
+          day: string
+          detail: string | null
+          done_at: string | null
+          id: string
+          quest_key: string
+          rp: number
+          slot: number
+          tier: number
+          title: string
+          user_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "quests"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      build_quests: {
+        Args: { a: Json; day: string; tier: number }
+        Returns: {
+          category: string
+          detail: string
+          quest_key: string
+          rp: number
+          slot: number
+          title: string
+        }[]
+      }
       create_invite: {
         Args: never
         Returns: {
@@ -310,6 +423,22 @@ export type Database = {
         }
       }
       is_partner: { Args: { other: string }; Returns: boolean }
+      quest_candidate: {
+        Args: {
+          area: string
+          breaker: string
+          category: string
+          detail: string
+          fixes: string[]
+          goals: string[]
+          key: string
+          need: number
+          serves: string[]
+          title: string
+        }
+        Returns: Json
+      }
+      quest_clock: { Args: { minutes: number }; Returns: string }
       redeem_invite: {
         Args: { invite_code: string }
         Returns: {
@@ -327,6 +456,11 @@ export type Database = {
         }
       }
       run_length: { Args: { target: string; through: string }; Returns: number }
+      set_quest_done: {
+        Args: { done: boolean; quest: string }
+        Returns: undefined
+      }
+      submit_questionnaire: { Args: { answers: Json }; Returns: undefined }
       unpair: { Args: never; Returns: undefined }
     }
     Enums: {

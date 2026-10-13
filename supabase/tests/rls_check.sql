@@ -27,6 +27,8 @@ declare
   task_a uuid;
   high_c uuid;
   low_c uuid;
+  quest_c uuid;
+  answers jsonb := '{"wake":"7-8","sleep":"12-1","morning_feel":"tired","minutes":"30","exercise_time":"morning","exercise_freq":"1-2","enjoy":["walking","yoga"],"pushups":"knees","limits":"none","water":"4-6","junk":"weekly","breakfast":"sometimes","screen":"3-5","phone_morning":"always","reading":"never","reflection":"sometimes","planning":"never","goals":["fitness","phone"],"breaker":"phone","intensity":"steady"}';
   today date := (now() at time zone 'utc')::date;
   invite_code text;
   n integer;
@@ -104,17 +106,17 @@ begin
   select count(*) into n from public.profiles where id = a;
   if n = 1 then passed := passed + 1; else failures := failures || 'paired B cannot read A profile'; end if;
 
-  update public.tasks set title = 'hacked' where id = task_a;
-  get diagnostics n = row_count;
-  if n = 0 then passed := passed + 1; else failures := failures || 'B edited A task'; end if;
+  begin
+    update public.tasks set title = 'hacked' where id = task_a;
+    failures := failures || 'B edited A task';
+  exception when insufficient_privilege then passed := passed + 1;
+  end;
 
-  update public.tasks set archived = true where id = task_a;
-  get diagnostics n = row_count;
-  if n = 0 then passed := passed + 1; else failures := failures || 'B archived A task'; end if;
-
-  delete from public.task_completions where task_id = task_a;
-  get diagnostics n = row_count;
-  if n = 0 then passed := passed + 1; else failures := failures || 'B unticked A task'; end if;
+  begin
+    delete from public.task_completions where task_id = task_a;
+    failures := failures || 'B unticked A task';
+  exception when insufficient_privilege then passed := passed + 1;
+  end;
 
   begin
     insert into public.task_completions (task_id, day) values (task_a, today + 1);
@@ -136,17 +138,30 @@ begin
   perform pg_temp.act_as(c);
   if public.run_length(a, today) = 0 then passed := passed + 1; else failures := failures || 'stranger C sees A run'; end if;
 
-  -- 4. Completions: own tasks only, today +/- 1 day only ----------------------
+  -- 4. Old hand-made tasks are read-only history, even for their owner (0005) -----
   perform pg_temp.act_as(a);
   begin
-    insert into public.task_completions (task_id, day) values (task_a, today - 10);
-    failures := failures || 'A backfilled a completion 10 days ago';
+    insert into public.tasks (title, kind) values ('My own task', 'daily');
+    failures := failures || 'A created a task';
   exception when insufficient_privilege then passed := passed + 1;
   end;
-  delete from public.task_completions where task_id = task_a and day = today;
-  insert into public.task_completions (task_id, day) values (task_a, today);
-  select count(*) into n from public.task_completions where task_id = task_a and user_id = a;
-  if n = 1 then passed := passed + 1; else failures := failures || 'A cannot untick/tick own task'; end if;
+  begin
+    update public.tasks set title = 'easier' where id = task_a;
+    failures := failures || 'A edited a task';
+  exception when insufficient_privilege then passed := passed + 1;
+  end;
+  begin
+    insert into public.task_completions (task_id, day) values (task_a, today);
+    failures := failures || 'A ticked an old task';
+  exception when insufficient_privilege then passed := passed + 1;
+  end;
+  begin
+    delete from public.task_completions where task_id = task_a;
+    failures := failures || 'A unticked an old task';
+  exception when insufficient_privilege then passed := passed + 1;
+  end;
+  select count(*) into n from public.tasks where id = task_a;
+  if n = 1 then passed := passed + 1; else failures := failures || 'A cannot read own tasks'; end if;
 
   -- 5. Cheers: partner only, max 5 per day ------------------------------------
   perform pg_temp.act_as(b);
@@ -201,34 +216,137 @@ begin
   n := public.run_length(c, today - 3);
   if n = 1 then passed := passed + 1; else failures := failures || format('run on a counting day: expected 1, got %s', n); end if;
 
-  insert into public.task_completions (task_id, day) values (low_c, today);
+  perform pg_temp.act_as_admin();
+  insert into public.task_completions (task_id, user_id, day) values (low_c, c, today);
+  perform pg_temp.act_as(c);
   n := public.run_length(c, today);
   if n = 0 then passed := passed + 1; else failures := failures || format('Low only (1/4) should not count, got %s', n); end if;
-  insert into public.task_completions (task_id, day) values (high_c, today);
+  perform pg_temp.act_as_admin();
+  insert into public.task_completions (task_id, user_id, day) values (high_c, c, today);
+  perform pg_temp.act_as(c);
   n := public.run_length(c, today);
   if n = 2 then passed := passed + 1; else failures := failures || format('run with today: expected 2, got %s', n); end if;
 
   -- A task added today doesn't change yesterday's verdict.
-  insert into public.tasks (title, kind, priority) values ('New high', 'daily', 3);
+  perform pg_temp.act_as_admin();
+  insert into public.tasks (user_id, title, kind, priority) values (c, 'New high', 'daily', 3);
+  perform pg_temp.act_as(c);
   n := public.run_length(c, today - 1);
   if n = 1 then passed := passed + 1; else failures := failures || format('new task rewrote history: got %s', n); end if;
 
   -- Archiving sets archived_at and only affects days from now on.
+  perform pg_temp.act_as_admin();
   update public.tasks set archived = true where id = low_c;
+  perform pg_temp.act_as(c);
   select count(*) into n from public.tasks where id = low_c and archived_at is not null;
   if n = 1 then passed := passed + 1; else failures := failures || 'archived_at not set'; end if;
   n := public.run_length(c, today - 1);
   if n = 1 then passed := passed + 1; else failures := failures || format('archive rewrote history: got %s', n); end if;
 
+  perform pg_temp.act_as_admin();
   begin
-    update public.tasks set archived_at = null where id = low_c;
-    failures := failures || 'user wrote archived_at';
+    insert into public.tasks (user_id, title, kind, priority) values (c, 'Too important', 'daily', 5);
+    failures := failures || 'priority 5 accepted';
+  exception when check_violation then passed := passed + 1;
+  end;
+
+  -- 9. Questionnaire and quests (0005) ---------------------------------------------
+  perform pg_temp.act_as(c);
+  begin
+    perform public.assign_quests();
+    failures := failures || 'quests assigned without a questionnaire';
+  exception when raise_exception then passed := passed + 1;
+  end;
+  begin
+    perform public.submit_questionnaire(answers - 'goals');
+    failures := failures || 'questionnaire with 19 answers accepted';
+  exception when raise_exception then passed := passed + 1;
+  end;
+  begin
+    perform public.submit_questionnaire(jsonb_set(answers, '{goals}', '["fitness", "sleep", "focus"]'));
+    failures := failures || 'three goals accepted';
+  exception when raise_exception then passed := passed + 1;
+  end;
+  begin
+    perform public.submit_questionnaire(jsonb_set(answers, '{wake}', '"noon"'));
+    failures := failures || 'unknown option accepted';
+  exception when raise_exception then passed := passed + 1;
+  end;
+  perform public.submit_questionnaire(answers);
+  begin
+    perform public.submit_questionnaire(answers);
+    failures := failures || 'questionnaire answered twice';
+  exception when raise_exception then passed := passed + 1;
+  end;
+
+  -- 30 min a day -> 5 quests; a second call returns the same ones.
+  select count(*) into n from public.assign_quests();
+  if n = 5 then passed := passed + 1; else failures := failures || format('expected 5 quests, got %s', n); end if;
+  perform public.assign_quests();
+  select count(*) into n from public.quests where user_id = c and day = today;
+  if n = 5 then passed := passed + 1; else failures := failures || format('quests generated twice: %s rows', n); end if;
+
+  begin
+    insert into public.quests (user_id, day, slot, quest_key, title, category, rp, tier)
+      values (c, today, 9, 'my.own', 'Easy one', 'other', 3, 1);
+    failures := failures || 'user inserted a quest';
   exception when insufficient_privilege then passed := passed + 1;
   end;
   begin
-    insert into public.tasks (title, kind, priority) values ('Too important', 'daily', 5);
-    failures := failures || 'priority 5 accepted';
-  exception when check_violation then passed := passed + 1;
+    update public.quests set rp = 3 where user_id = c;
+    failures := failures || 'user edited a quest';
+  exception when insufficient_privilege then passed := passed + 1;
+  end;
+  begin
+    delete from public.quests where user_id = c;
+    failures := failures || 'user deleted a quest';
+  exception when insufficient_privilege then passed := passed + 1;
+  end;
+
+  -- Today's quests override today's old tasks: nothing ticked -> today doesn't count.
+  n := public.run_length(c, today);
+  if n = 0 then passed := passed + 1; else failures := failures || format('unticked quests counted: %s', n); end if;
+  for quest_c in select id from public.quests where user_id = c and day = today loop
+    perform public.set_quest_done(quest_c, true);
+  end loop;
+  n := public.run_length(c, today);
+  if n = 2 then passed := passed + 1; else failures := failures || format('all quests ticked: expected run 2, got %s', n); end if;
+  perform public.set_quest_done(quest_c, false);
+  select count(*) into n from public.quests where id = quest_c and done_at is null;
+  if n = 1 then passed := passed + 1; else failures := failures || 'untick did not clear done_at'; end if;
+
+  -- Yesterday's quests can't be ticked.
+  perform pg_temp.act_as_admin();
+  insert into public.quests (user_id, day, slot, quest_key, title, category, rp, tier)
+    values (c, today - 1, 1, 'move.walk', 'Walk', 'body', 3, 1) returning id into quest_c;
+  perform pg_temp.act_as(c);
+  begin
+    perform public.set_quest_done(quest_c, true);
+    failures := failures || 'ticked yesterday''s quest';
+  exception when raise_exception then passed := passed + 1;
+  end;
+
+  -- B is not C's partner: no quests, no ticking them. Once paired: quests yes, answers no.
+  perform pg_temp.act_as(b);
+  select count(*) into n from public.quests where user_id = c;
+  if n = 0 then passed := passed + 1; else failures := failures || 'stranger B reads C quests'; end if;
+  begin
+    perform public.set_quest_done(quest_c, true);
+    failures := failures || 'B ticked C quest';
+  exception when raise_exception then passed := passed + 1;
+  end;
+  perform pg_temp.act_as(c);
+  select code into invite_code from public.create_invite();
+  perform pg_temp.act_as(b);
+  perform public.redeem_invite(invite_code);
+  select count(*) into n from public.quests where user_id = c and day = today;
+  if n = 5 then passed := passed + 1; else failures := failures || 'partner B cannot read C quests'; end if;
+  select count(*) into n from public.questionnaires where user_id = c;
+  if n = 0 then passed := passed + 1; else failures := failures || 'partner B reads C answers'; end if;
+  begin
+    perform public.build_quests(answers, 1, today);
+    failures := failures || 'user can call build_quests directly';
+  exception when insufficient_privilege then passed := passed + 1;
   end;
 
   -- 7. Signed-out (anon) gets nothing ------------------------------------------

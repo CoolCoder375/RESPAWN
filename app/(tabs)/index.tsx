@@ -1,30 +1,26 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
-import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
-import { AddTaskForm } from '@/components/AddTaskForm';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
-import { EmptyTasks } from '@/components/EmptyTasks';
 import { ProgressBar } from '@/components/ProgressBar';
+import { QuestRow } from '@/components/QuestRow';
 import { Screen } from '@/components/Screen';
-import { TaskEditor } from '@/components/TaskEditor';
-import { TaskRow } from '@/components/TaskRow';
 import { useLocalDay } from '@/hooks/useLocalDay';
 import { useProfile, type Profile } from '@/hooks/useProfile';
 import {
-  splitDay,
-  useDay,
+  dayStatus,
   useRunThroughYesterday,
-  useTaskActions,
-  type DayTask,
-  type NewTask,
-  type Task,
-} from '@/hooks/useTasks';
-import { dayOfSeason, SEASON_LENGTH } from '@/lib/dates';
-import { runStatus, type DayScore } from '@/lib/points';
+  useTickQuest,
+  useTodayQuests,
+  type Quest,
+} from '@/hooks/useQuests';
+import { SEASON_LENGTH } from '@/lib/dates';
+import type { DayScore } from '@/lib/points';
 import { colors, fonts, space } from '@/theme';
+
+const TIERS = ['Foundation', 'Build', 'Push', 'Master'];
 
 export default function TodayScreen() {
   const { data: profile } = useProfile();
@@ -36,15 +32,11 @@ export default function TodayScreen() {
 function Today({ profile }: { profile: Profile }) {
   const userId = profile.id;
   const today = useLocalDay(profile.timezone);
-  const dayQuery = useDay(userId, today);
+  const questsQuery = useTodayQuests(userId, today);
   const pastRun = useRunThroughYesterday(userId, today);
-  const actions = useTaskActions(userId, today);
-  const [editing, setEditing] = useState<Task | null>(null);
-  const [showDone, setShowDone] = useState(false);
+  const tick = useTickQuest(userId, today);
 
-  const seasonDay = dayOfSeason(profile.season_start, today);
-
-  if (dayQuery.isPending) {
+  if (questsQuery.isPending) {
     return (
       <View style={styles.center}>
         <ActivityIndicator color={colors.accent} />
@@ -52,39 +44,34 @@ function Today({ profile }: { profile: Profile }) {
     );
   }
 
-  if (dayQuery.isError) {
+  if (questsQuery.isError) {
     return (
       <Screen edges={[]}>
-        <AppText variant="title">Couldn’t load today’s tasks</AppText>
-        <AppText variant="muted">{dayQuery.error.message}</AppText>
-        <Button title="Try again" onPress={() => dayQuery.refetch()} />
+        <AppText variant="title">Couldn’t load today’s quests</AppText>
+        <AppText variant="muted">{questsQuery.error.message}</AppText>
+        <Button title="Try again" onPress={() => questsQuery.refetch()} />
       </Screen>
     );
   }
 
-  const data = dayQuery.data;
-  const { list, finished, score } = splitDay(data, today);
-  const run = runStatus(pastRun.data ?? 0, score.counts);
-  // Day X is your current run, but never beyond the days since your season started.
-  const day = Math.min(run.day, seasonDay);
+  const quests = questsQuery.data;
+  const { score, run, seasonDay, day } = dayStatus(
+    quests,
+    pastRun.data ?? 0,
+    profile.season_start,
+    today,
+  );
+  const tier = quests[0]?.tier;
 
-  function toggle(task: DayTask) {
-    const done = !task.done;
-    const securesToday =
-      done &&
-      task.kind === 'daily' &&
-      !score.counts &&
-      (score.earned + task.priority) * 2 >= score.possible;
+  function toggle(quest: Quest) {
+    const done = !quest.done_at;
+    const securesToday = done && !score.counts && (score.earned + quest.rp) * 2 >= score.possible;
     if (securesToday) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } else {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-    actions.toggle(task, done);
-  }
-
-  function add(task: NewTask) {
-    actions.add(task, data.tasks);
+    tick(quest, done);
   }
 
   return (
@@ -105,69 +92,28 @@ function Today({ profile }: { profile: Profile }) {
         <AppText variant="muted">{statusLine(score, run.day)}</AppText>
       </View>
 
-      {list.length === 0 ? (
-        <EmptyTasks onAdd={add} />
-      ) : (
-        <View style={styles.list}>
-          {list.map((task) => (
-            <TaskRow
-              key={task.id}
-              task={task}
-              onToggle={() => toggle(task)}
-              onPress={() => setEditing(task)}
-            />
-          ))}
+      <View style={styles.list}>
+        <View style={styles.listHeader}>
+          <AppText variant="label">Today’s quests</AppText>
+          {tier ? <AppText variant="label">{TIERS[tier - 1]} tier</AppText> : null}
         </View>
-      )}
+        {quests.map((quest) => (
+          <QuestRow key={quest.id} quest={quest} onToggle={() => toggle(quest)} />
+        ))}
+      </View>
 
-      <AddTaskForm onAdd={add} />
-
-      {finished.length > 0 ? (
-        <View style={styles.list}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ expanded: showDone }}
-            onPress={() => setShowDone((v) => !v)}
-            style={styles.doneHeader}
-          >
-            <AppText variant="label">Done ({finished.length})</AppText>
-            <Ionicons
-              name={showDone ? 'chevron-up' : 'chevron-down'}
-              size={18}
-              color={colors.muted}
-            />
-          </Pressable>
-          {showDone
-            ? finished.map((task) => (
-                <TaskRow
-                  key={task.id}
-                  task={task}
-                  onToggle={() => toggle(task)}
-                  onPress={() => setEditing(task)}
-                />
-              ))
-            : null}
-        </View>
-      ) : null}
-
-      <TaskEditor
-        task={editing}
-        onClose={() => setEditing(null)}
-        onSave={(changes) => {
-          if (editing) actions.edit(editing.id, changes);
-          setEditing(null);
-        }}
-        onDelete={() => {
-          if (editing) actions.archive(editing.id);
-          setEditing(null);
-        }}
-      />
+      <View style={styles.note}>
+        <Ionicons name="lock-closed" size={14} color={colors.muted} />
+        <AppText variant="muted" style={styles.noteText}>
+          Quests are set by Respawn from your answers and get harder as your run grows. Tick only
+          what you’ve really done.
+        </AppText>
+      </View>
     </Screen>
   );
 }
 
 function statusLine(score: DayScore, runDay: number): string {
-  if (score.possible === 0) return 'Add a daily task to start your run.';
   if (score.counts) return 'Today counts. Every extra RP is a bonus.';
   const left = score.needed - score.earned;
   const rp = `${left} more RP`;
@@ -217,10 +163,7 @@ const styles = StyleSheet.create({
   stat: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
   statText: { fontFamily: fonts.bodyMedium, color: colors.text },
   list: { gap: space.sm },
-  doneHeader: {
-    minHeight: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
+  listHeader: { flexDirection: 'row', justifyContent: 'space-between' },
+  note: { flexDirection: 'row', gap: space.sm, alignItems: 'flex-start' },
+  noteText: { flex: 1 },
 });

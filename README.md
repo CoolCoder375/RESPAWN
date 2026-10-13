@@ -10,6 +10,7 @@ Built with Expo (React Native, TypeScript, Expo Router), TanStack Query and Supa
 - [x] Milestone 2 – Database: schema, RLS, pairing functions, RLS test
 - [x] Milestone 3 – Today tab: tasks, daily/one-off, Respawn Points (priority), per-day ticks, Day X of 60 run with reset, streak
 - [x] Milestone 4 – Thought tab: verse of the day from the Gita and Puranas (Sanskrit, IAST, plain English, reflection), Save, Share
+- [x] Milestone 4.5 – Quests: 20-question questionnaire, daily quests assigned and locked by the server (see QUESTS.md)
 - [ ] Milestone 5 – Duo tab
 - [ ] Milestone 6 – Coach tab
 

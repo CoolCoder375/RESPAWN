@@ -17,6 +17,7 @@ import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { ToastProvider } from '@/components/Toast';
 import { useProfile } from '@/hooks/useProfile';
+import { useHasAnswered } from '@/hooks/useQuestionnaire';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { colors, fonts, space } from '@/theme';
 
@@ -55,16 +56,17 @@ export default function RootLayout() {
 
 /**
  * Routes the user by state:
- * signed out → sign-in; signed in without a profile → onboarding; otherwise → tabs.
+ * signed out → sign-in; no profile → onboarding; no answers → questionnaire; otherwise → tabs.
  */
 function AuthGate() {
   const { session, ready } = useAuth();
   const profile = useProfile();
+  const answered = useHasAnswered();
 
   const signedIn = !!session;
-  const loadingProfile = signedIn && profile.isPending;
-  const loading = !ready || loadingProfile;
   const hasProfile = !!profile.data;
+  const loading = !ready || (signedIn && profile.isPending) || (hasProfile && answered.isPending);
+  const hasAnswered = !!answered.data;
 
   useEffect(() => {
     if (!loading) SplashScreen.hideAsync();
@@ -78,12 +80,18 @@ function AuthGate() {
     );
   }
 
-  if (signedIn && profile.isError && !hasProfile) {
+  const failed =
+    signedIn && profile.isError && !hasProfile
+      ? profile
+      : hasProfile && answered.isError && answered.data === undefined
+        ? answered
+        : null;
+  if (failed) {
     return (
       <View style={styles.error}>
         <AppText variant="title">Couldn’t load your profile</AppText>
-        <AppText variant="muted">{profile.error.message}</AppText>
-        <Button title="Try again" onPress={() => profile.refetch()} loading={profile.isFetching} />
+        <AppText variant="muted">{failed.error?.message}</AppText>
+        <Button title="Try again" onPress={() => failed.refetch()} loading={failed.isFetching} />
       </View>
     );
   }
@@ -99,7 +107,7 @@ function AuthGate() {
         headerShadowVisible: false,
       }}
     >
-      <Stack.Protected guard={signedIn && hasProfile}>
+      <Stack.Protected guard={signedIn && hasProfile && hasAnswered}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="settings" options={{ headerShown: true, title: 'Settings' }} />
         <Stack.Screen
@@ -109,6 +117,9 @@ function AuthGate() {
       </Stack.Protected>
       <Stack.Protected guard={signedIn && !hasProfile}>
         <Stack.Screen name="(auth)/onboarding" />
+      </Stack.Protected>
+      <Stack.Protected guard={signedIn && hasProfile && !hasAnswered}>
+        <Stack.Screen name="(auth)/questionnaire" />
       </Stack.Protected>
       <Stack.Protected guard={!signedIn}>
         <Stack.Screen name="(auth)/sign-in" />
