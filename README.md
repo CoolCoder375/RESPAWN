@@ -11,7 +11,8 @@ Built with Expo (React Native, TypeScript, Expo Router), TanStack Query and Supa
 - [x] Milestone 3 – Today tab: tasks, daily/one-off, Respawn Points (priority), per-day ticks, Day X of 60 run with reset, streak
 - [x] Milestone 4 – Thought tab: verse of the day from the Gita and Puranas (Sanskrit, IAST, plain English, reflection), Save, Share
 - [x] Milestone 4.5 – Quests: 20-question questionnaire, daily quests assigned and locked by the server (see QUESTS.md)
-- [ ] Milestone 5 – Duo tab
+- [x] Milestone 5 – Duo tab: invite code, live partner quests and progress cards, cheers with banner, unpair
+- [x] Journal: a daily journal quest, ticked by writing the entry (private, today only)
 - [ ] Milestone 6 – Coach tab
 
 ## Setup
@@ -48,3 +49,14 @@ src/components/ shared UI
 src/theme.ts    design tokens
 supabase/       config, migrations, edge functions
 ```
+
+## Android APK (no laptop needed)
+
+One-time: an Expo account, `npx eas-cli login`, `npx eas-cli init`, and the two Supabase values in the EAS `preview` environment:
+
+```bash
+npx eas-cli env:create --environment preview --name EXPO_PUBLIC_SUPABASE_URL --value <url> --visibility plaintext
+npx eas-cli env:create --environment preview --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value <publishable key> --visibility plaintext
+```
+
+Build: `npx eas-cli build -p android --profile preview`. The build page gives a link and QR code to download and install the APK.

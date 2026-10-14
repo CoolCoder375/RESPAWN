@@ -48,7 +48,7 @@ The 50% RP rule and the reset to Day 1 stay exactly as they are.
 
 ## How a day's quests are built
 
-**How many:** this depends on Q4. 15 min gives 4 quests, 30 gives 5, 45 gives 6, and 60+ gives 7.
+**How many:** this depends on Q4. 15 min gives 4 quests, 30 gives 5, 45 gives 6, and 60+ gives 7, plus the daily journal (added in migration 0006). If your answers had already picked the optional journal quest, the daily one takes its place instead of adding one.
 
 **Always included:**
 
@@ -58,6 +58,7 @@ The 50% RP rule and the reset to Day 1 stay exactly as they are.
 | Sleep    | 2 RP  | From Q1, Q2, Q3                                       |
 | Mind     | 2 RP  | From Q13–Q17, aimed at the weakest answer             |
 | Verse    | 1 RP  | "Read today's verse and its reflection" (Thought tab) |
+| Journal  | 2 RP  | "Write N lines in your journal" (Journal screen)      |
 
 **Choosing quests:** each candidate quest gets a score:
 
@@ -107,7 +108,6 @@ Each quest has four values, one per tier (Foundation / Build / Push / Master).
 - Read 5 / 10 / 15 / 20 pages.
 - Sit quietly: meditation, prayer or jap, 5 / 10 / 15 / 20 min.
 - Plan tomorrow in 3 lines.
-- Journal: 1 / 2 / 3 / 5 lines.
 - Phone screen time under 3h / 2.5h / 2h / 1.5h (check it in your phone settings). It's 4h → 2.5h if you're on 5h+ now, and 2h → 1h if you're under 3h.
 
 **Food and body care**
@@ -120,6 +120,13 @@ Each quest has four values, one per tier (Foundation / Build / Push / Master).
 **Verse**
 
 - Read today's verse and its reflection.
+
+**Journal** (every day, since migration 0006)
+
+- Write 1 / 2 / 3 / 5 lines in your journal. Blank lines don't count.
+- It can't be ticked by hand. Tapping it on Today opens the Journal screen, and saving an entry with enough lines ticks it. Shortening the entry below the target unticks it.
+- Only today's entry can be written (10 minutes' grace after midnight). Past entries are read-only.
+- Entries are private. Your partner sees the quest's tick, never the words.
 
 ## What changes in the app and database
 

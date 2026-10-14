@@ -88,6 +88,38 @@ export type Database = {
           },
         ]
       }
+      journal_entries: {
+        Row: {
+          body: string
+          created_at: string
+          day: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          day: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          day?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journal_entries_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pair_invites: {
         Row: {
           code: string
@@ -423,6 +455,8 @@ export type Database = {
         }
       }
       is_partner: { Args: { other: string }; Returns: boolean }
+      journal_line_count: { Args: { body: string }; Returns: number }
+      journal_lines_needed: { Args: { tier: number }; Returns: number }
       quest_candidate: {
         Args: {
           area: string
@@ -456,6 +490,22 @@ export type Database = {
         }
       }
       run_length: { Args: { target: string; through: string }; Returns: number }
+      save_journal: {
+        Args: { body: string; day: string }
+        Returns: {
+          body: string
+          created_at: string
+          day: string
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "journal_entries"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       set_quest_done: {
         Args: { done: boolean; quest: string }
         Returns: undefined

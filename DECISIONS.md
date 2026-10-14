@@ -100,3 +100,25 @@ Writing your own tasks let you make the day easy whenever you wanted, so the str
 - **The tier follows Day X**, so a reset also drops quests back to Foundation.
 - **Old tasks** were archived by migration 0005 and stay as read-only history; `run_length()` uses them for days before quests existed, so existing runs carry over.
 - **Answers are once only** in Phase 1. Retaking belongs with new seasons.
+
+## The journal is written, not ticked
+
+Journaling was only an optional mind quest that the scoring rarely picked. Since migration 0006, every day has a "Write N lines in your journal" quest (2 RP; 1 / 2 / 3 / 5 lines by tier).
+
+- **Proof, not honour:** `set_quest_done()` refuses the journal quest. `save_journal(day, body)` writes the entry and ticks or unticks the quest from the non-blank line count, so the tick always matches what was written.
+- **Same lock as quests:** users have no write grants on `journal_entries`; today only, with the 10-minute grace after midnight.
+- **Private:** only the author can read an entry, not the partner, unlike quests.
+- **Added in `assign_quests()`, not `build_quests()`:** the journal quest is appended after generation, and it's also added to a day that was generated before 0006, so it appeared on the day it shipped. If the rules had already picked the optional `mind.journal`, that quest is dropped, so a calm-goal day doesn't get two journal quests.
+
+## Duo: live updates refetch, they don't patch
+
+The Duo tab subscribes to Supabase Realtime `postgres_changes` on the partner's `quests` (and your incoming `cheers`) and simply refetches that query on any event. It doesn't merge payloads into the cache, so the screen always shows what RLS returns. A partner's tick arrives in about 0.6 s in the live two-user test (the plan's target is under 2 s).
+
+- `profiles` isn't in the Realtime publication, so pairing is picked up by refetching your profile every 5 s while your invite code is live, and whenever the Duo tab gets focus (covers the partner unpairing).
+- The partner's card is computed with the same `dayStatus()` as your Today header, using their own timezone for "today" and `run_length()` (RLS lets a partner call it).
+- A partner who hasn't opened the app today has no quests yet; the card says so instead of showing 0 / 0.
+- Cheers show as a banner on the receiver's Today tab until dismissed (`seen_at`), and arrive live. The 5-a-day limit is the existing database trigger; the app only displays it.
+
+## Android builds via EAS, with the Supabase settings as EAS environment variables
+
+`eas.json` has a `preview` profile that builds an installable APK (internal distribution). The two `EXPO_PUBLIC_*` values come from the EAS `preview` environment (`eas env:create`), not from the gitignored `.env`, which EAS Build never sees. Both values are public by design; the Gemini key will never be one of them.

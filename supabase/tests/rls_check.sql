@@ -279,12 +279,12 @@ begin
   exception when raise_exception then passed := passed + 1;
   end;
 
-  -- 30 min a day -> 5 quests; a second call returns the same ones.
+  -- 30 min a day -> 5 quests + the journal; a second call returns the same ones.
   select count(*) into n from public.assign_quests();
-  if n = 5 then passed := passed + 1; else failures := failures || format('expected 5 quests, got %s', n); end if;
+  if n = 6 then passed := passed + 1; else failures := failures || format('expected 6 quests, got %s', n); end if;
   perform public.assign_quests();
   select count(*) into n from public.quests where user_id = c and day = today;
-  if n = 5 then passed := passed + 1; else failures := failures || format('quests generated twice: %s rows', n); end if;
+  if n = 6 then passed := passed + 1; else failures := failures || format('quests generated twice: %s rows', n); end if;
 
   begin
     insert into public.quests (user_id, day, slot, quest_key, title, category, rp, tier)
@@ -306,9 +306,10 @@ begin
   -- Today's quests override today's old tasks: nothing ticked -> today doesn't count.
   n := public.run_length(c, today);
   if n = 0 then passed := passed + 1; else failures := failures || format('unticked quests counted: %s', n); end if;
-  for quest_c in select id from public.quests where user_id = c and day = today loop
+  for quest_c in select id from public.quests where user_id = c and day = today and quest_key <> 'journal.write' loop
     perform public.set_quest_done(quest_c, true);
   end loop;
+  perform public.save_journal(today, 'Walked, slept on time.');
   n := public.run_length(c, today);
   if n = 2 then passed := passed + 1; else failures := failures || format('all quests ticked: expected run 2, got %s', n); end if;
   perform public.set_quest_done(quest_c, false);
@@ -340,7 +341,7 @@ begin
   perform pg_temp.act_as(b);
   perform public.redeem_invite(invite_code);
   select count(*) into n from public.quests where user_id = c and day = today;
-  if n = 5 then passed := passed + 1; else failures := failures || 'partner B cannot read C quests'; end if;
+  if n = 6 then passed := passed + 1; else failures := failures || 'partner B cannot read C quests'; end if;
   select count(*) into n from public.questionnaires where user_id = c;
   if n = 0 then passed := passed + 1; else failures := failures || 'partner B reads C answers'; end if;
   begin
@@ -348,6 +349,47 @@ begin
     failures := failures || 'user can call build_quests directly';
   exception when insufficient_privilege then passed := passed + 1;
   end;
+
+  -- 10. Journal (0006) ----------------------------------------------------------------
+  perform pg_temp.act_as(c);
+  select id into quest_c from public.quests where user_id = c and day = today and quest_key = 'journal.write';
+  if quest_c is not null then passed := passed + 1; else failures := failures || 'no journal quest today'; end if;
+  begin
+    perform public.set_quest_done(quest_c, false);
+    failures := failures || 'journal quest unticked by hand';
+  exception when raise_exception then passed := passed + 1;
+  end;
+  -- Tier 1 asks for 1 line: blank lines don't count, emptying the entry unticks the quest.
+  perform public.save_journal(today, E'\n  \n');
+  select count(*) into n from public.quests where id = quest_c and done_at is null;
+  if n = 1 then passed := passed + 1; else failures := failures || 'blank journal ticked the quest'; end if;
+  select count(*) into n from public.journal_entries where user_id = c and day = today;
+  if n = 0 then passed := passed + 1; else failures := failures || 'blank journal kept an entry'; end if;
+  perform public.save_journal(today, E'Hard day.\nStill walked.');
+  select count(*) into n from public.quests where id = quest_c and done_at is not null;
+  if n = 1 then passed := passed + 1; else failures := failures || 'journal did not tick the quest'; end if;
+  begin
+    perform public.save_journal(today - 1, 'Backdated');
+    failures := failures || 'wrote yesterday''s journal';
+  exception when raise_exception then passed := passed + 1;
+  end;
+  begin
+    insert into public.journal_entries (user_id, day, body) values (c, today, 'direct');
+    failures := failures || 'user inserted a journal entry directly';
+  exception when insufficient_privilege then passed := passed + 1;
+  end;
+  begin
+    update public.journal_entries set body = 'x' where user_id = c;
+    failures := failures || 'user updated a journal entry directly';
+  exception when insufficient_privilege then passed := passed + 1;
+  end;
+  -- Even the partner can't read it.
+  perform pg_temp.act_as(b);
+  select count(*) into n from public.journal_entries where user_id = c;
+  if n = 0 then passed := passed + 1; else failures := failures || 'partner B reads C journal'; end if;
+  perform pg_temp.act_as(c);
+  select count(*) into n from public.journal_entries where user_id = c;
+  if n = 1 then passed := passed + 1; else failures := failures || 'C cannot read own journal'; end if;
 
   -- 7. Signed-out (anon) gets nothing ------------------------------------------
   perform pg_temp.act_as_admin();

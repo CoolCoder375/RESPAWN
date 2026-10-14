@@ -114,6 +114,7 @@ function AuthGate() {
           name="saved-thoughts"
           options={{ headerShown: true, title: 'Saved verses' }}
         />
+        <Stack.Screen name="journal" options={{ headerShown: true, title: 'Journal' }} />
       </Stack.Protected>
       <Stack.Protected guard={signedIn && !hasProfile}>
         <Stack.Screen name="(auth)/onboarding" />

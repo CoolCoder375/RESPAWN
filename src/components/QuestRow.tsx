@@ -10,20 +10,23 @@ type Props = {
   quest: Quest;
   /** Without it the row is read-only (partner view). */
   onToggle?: () => void;
+  /** Instead of ticking, the row opens the screen that completes the quest (the journal). */
+  onOpen?: () => void;
 };
 
-/** A quest with a tick box. The whole row ticks. */
-export function QuestRow({ quest, onToggle }: Props) {
+/** A quest with a tick box. The whole row ticks, or opens `onOpen`. */
+export function QuestRow({ quest, onToggle, onOpen }: Props) {
+  const onPress = onOpen ?? onToggle;
   const done = !!quest.done_at;
   const category = isCategory(quest.category) ? quest.category : null;
 
   return (
     <Pressable
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked: done, disabled: !onToggle }}
-      accessibilityLabel={`${quest.title}, ${quest.rp} RP`}
-      disabled={!onToggle}
-      onPress={onToggle}
+      accessibilityRole={onOpen ? 'button' : 'checkbox'}
+      accessibilityState={onOpen ? { disabled: false } : { checked: done, disabled: !onToggle }}
+      accessibilityLabel={`${quest.title}, ${quest.rp} RP${onOpen && done ? ', done' : ''}`}
+      disabled={!onPress}
+      onPress={onPress}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
     >
       <View style={styles.checkHit}>
@@ -43,6 +46,7 @@ export function QuestRow({ quest, onToggle }: Props) {
           ) : null}
         </View>
       </View>
+      {onOpen ? <Ionicons name="chevron-forward" size={20} color={colors.muted} /> : null}
     </Pressable>
   );
 }

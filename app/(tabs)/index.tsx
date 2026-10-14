@@ -1,13 +1,16 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
+import { CheerBanner } from '@/components/CheerBanner';
 import { ProgressBar } from '@/components/ProgressBar';
 import { QuestRow } from '@/components/QuestRow';
 import { Screen } from '@/components/Screen';
 import { useLocalDay } from '@/hooks/useLocalDay';
+import { usePartner } from '@/hooks/usePartner';
 import { useProfile, type Profile } from '@/hooks/useProfile';
 import {
   dayStatus,
@@ -17,6 +20,7 @@ import {
   type Quest,
 } from '@/hooks/useQuests';
 import { SEASON_LENGTH } from '@/lib/dates';
+import { isJournalQuest } from '@/lib/journal';
 import type { DayScore } from '@/lib/points';
 import { colors, fonts, space } from '@/theme';
 
@@ -35,6 +39,7 @@ function Today({ profile }: { profile: Profile }) {
   const questsQuery = useTodayQuests(userId, today);
   const pastRun = useRunThroughYesterday(userId, today);
   const tick = useTickQuest(userId, today);
+  const partner = usePartner(profile);
 
   if (questsQuery.isPending) {
     return (
@@ -76,6 +81,7 @@ function Today({ profile }: { profile: Profile }) {
 
   return (
     <Screen edges={[]}>
+      <CheerBanner userId={userId} partnerName={partner.data?.display_name} />
       <View style={styles.header}>
         <AppText variant="label">Hey {profile.display_name}</AppText>
         <SeasonTitle day={seasonDay < 1 ? seasonDay : day} />
@@ -97,9 +103,13 @@ function Today({ profile }: { profile: Profile }) {
           <AppText variant="label">Today’s quests</AppText>
           {tier ? <AppText variant="label">{TIERS[tier - 1]} tier</AppText> : null}
         </View>
-        {quests.map((quest) => (
-          <QuestRow key={quest.id} quest={quest} onToggle={() => toggle(quest)} />
-        ))}
+        {quests.map((quest) =>
+          isJournalQuest(quest) ? (
+            <QuestRow key={quest.id} quest={quest} onOpen={() => router.push('/journal')} />
+          ) : (
+            <QuestRow key={quest.id} quest={quest} onToggle={() => toggle(quest)} />
+          ),
+        )}
       </View>
 
       <View style={styles.note}>

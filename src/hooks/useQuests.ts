@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useToast } from '@/components/Toast';
+import { useRealtimeRefetch } from '@/hooks/useRealtime';
 import { addDays, dayOfSeason } from '@/lib/dates';
 import type { Tables } from '@/lib/database.types';
 import { runStatus, scoreDay } from '@/lib/points';
@@ -26,7 +27,29 @@ export function useTodayQuests(userId: string, today: string) {
   });
 }
 
-/** Today's RP score, Day X and streak. */
+/**
+ * Your partner's quests for their local day, read-only, refreshed live as they tick.
+ * Empty until they open Respawn that day (that's when quests are generated).
+ */
+export function usePartnerQuests(partnerId: string, day: string) {
+  const key = questsKey(partnerId, day);
+  useRealtimeRefetch('quests', `user_id=eq.${partnerId}`, key);
+  return useQuery({
+    queryKey: key,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('quests')
+        .select('*')
+        .eq('user_id', partnerId)
+        .eq('day', day)
+        .order('slot');
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+/** Today's RP score, Day X and streak, the same way for you and your partner. */
 export function dayStatus(
   quests: Quest[],
   runThroughYesterday: number,
