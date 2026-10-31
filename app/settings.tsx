@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, Linking, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
@@ -8,6 +8,8 @@ import { Screen } from '@/components/Screen';
 import { useProfile, type Profile } from '@/hooks/useProfile';
 import { usePartner, useUnpair } from '@/hooks/usePartner';
 import { useAuth } from '@/lib/auth';
+import { registerForPush, unregisterPush, usePushStatus } from '@/lib/notifications';
+import { REMINDER_HOUR, sendTestNotification } from '@/lib/reminders';
 import { supabase } from '@/lib/supabase';
 import { space } from '@/theme';
 
@@ -37,7 +39,14 @@ function SettingsForm({ profile, email }: { profile: Profile; email?: string }) 
   function confirmSignOut() {
     Alert.alert('Sign out?', 'You can sign back in with your email.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: () => supabase.auth.signOut() },
+      {
+        text: 'Sign out',
+        style: 'destructive',
+        onPress: async () => {
+          await unregisterPush().catch(() => {});
+          await supabase.auth.signOut();
+        },
+      },
     ]);
   }
 
@@ -57,12 +66,61 @@ function SettingsForm({ profile, email }: { profile: Profile; email?: string }) 
           />
         </View>
       ) : null}
+      <NotificationsSection />
       <View style={styles.section}>
         <AppText variant="label">Account</AppText>
         <AppText variant="muted">{email}</AppText>
         <Button title="Sign out" variant="danger" onPress={confirmSignOut} />
       </View>
     </Screen>
+  );
+}
+
+function NotificationsSection() {
+  const push = usePushStatus();
+  const hour = REMINDER_HOUR > 12 ? `${REMINDER_HOUR - 12} pm` : `${REMINDER_HOUR} am`;
+
+  async function test() {
+    try {
+      await sendTestNotification();
+    } catch (error) {
+      Alert.alert('Couldn’t send a test', error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  return (
+    <View style={styles.section}>
+      <AppText variant="label">Notifications</AppText>
+      {push.state === 'checking' ? <AppText variant="muted">Checking…</AppText> : null}
+      {push.state === 'on' ? (
+        <>
+          <AppText variant="muted">
+            On. You get a reminder at {hour} if quests are left, and a notification when your
+            partner cheers you.
+          </AppText>
+          <Button title="Send a test notification" variant="ghost" onPress={test} />
+        </>
+      ) : null}
+      {push.state === 'blocked' ? (
+        <>
+          <AppText variant="muted">
+            Notifications are turned off for Respawn. Turn them on in your phone’s settings, then
+            come back.
+          </AppText>
+          <Button title="Open phone settings" variant="ghost" onPress={() => Linking.openSettings()} />
+          <Button title="Check again" variant="ghost" onPress={registerForPush} />
+        </>
+      ) : null}
+      {push.state === 'error' ? (
+        <>
+          <AppText variant="muted">
+            Reminders work, but cheers can’t reach this phone yet. Error: {push.message}
+          </AppText>
+          <Button title="Try again" variant="ghost" onPress={registerForPush} />
+          <Button title="Send a test notification" variant="ghost" onPress={test} />
+        </>
+      ) : null}
+    </View>
   );
 }
 

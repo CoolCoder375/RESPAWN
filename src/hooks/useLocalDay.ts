@@ -5,7 +5,7 @@ import { localDay } from '@/lib/dates';
 
 /**
  * Today's local day ("YYYY-MM-DD") in `timezone`, kept current: re-checked when the app
- * returns to the foreground and every 30 s while open, so daily tasks reset at midnight.
+ * returns to the foreground and every 30 s while open, so quests reset when the day ends (4 am).
  */
 export function useLocalDay(timezone: string): string {
   const [day, setDay] = useState(() => localDay(timezone));

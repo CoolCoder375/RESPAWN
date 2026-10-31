@@ -29,7 +29,7 @@ declare
   low_c uuid;
   quest_c uuid;
   answers jsonb := '{"wake":"7-8","sleep":"12-1","morning_feel":"tired","minutes":"30","exercise_time":"morning","exercise_freq":"1-2","enjoy":["walking","yoga"],"pushups":"knees","limits":"none","water":"4-6","junk":"weekly","breakfast":"sometimes","screen":"3-5","phone_morning":"always","reading":"never","reflection":"sometimes","planning":"never","goals":["fitness","phone"],"breaker":"phone","intensity":"steady"}';
-  today date := (now() at time zone 'utc')::date;
+  today date := public.respawn_day('UTC');
   invite_code text;
   n integer;
   passed integer := 0;
@@ -390,6 +390,100 @@ begin
   perform pg_temp.act_as(c);
   select count(*) into n from public.journal_entries where user_id = c;
   if n = 1 then passed := passed + 1; else failures := failures || 'C cannot read own journal'; end if;
+
+  -- 11. Journal on paper (0007) ---------------------------------------------------------
+  -- Clearing the text unticks; the notebook ticks with no text; undoing it unticks and removes the entry.
+  perform public.save_journal(today, '');
+  select count(*) into n from public.quests where id = quest_c and done_at is null;
+  if n = 1 then passed := passed + 1; else failures := failures || 'cleared journal kept the quest ticked'; end if;
+  perform public.set_journal_on_paper(today, true);
+  select count(*) into n from public.quests where id = quest_c and done_at is not null;
+  if n = 1 then passed := passed + 1; else failures := failures || 'notebook did not tick the quest'; end if;
+  -- Saving blank text keeps the notebook entry and the tick.
+  perform public.save_journal(today, '  ');
+  select count(*) into n from public.journal_entries where user_id = c and day = today and on_paper;
+  if n = 1 then passed := passed + 1; else failures := failures || 'blank save dropped the notebook entry'; end if;
+  perform public.set_journal_on_paper(today, false);
+  select count(*) into n from public.quests where id = quest_c and done_at is null;
+  if n = 1 then passed := passed + 1; else failures := failures || 'undoing notebook kept the tick'; end if;
+  select count(*) into n from public.journal_entries where user_id = c and day = today;
+  if n = 0 then passed := passed + 1; else failures := failures || 'undoing notebook kept an empty entry'; end if;
+  begin
+    perform public.set_journal_on_paper(today - 1, true);
+    failures := failures || 'marked yesterday''s journal on paper';
+  exception when raise_exception then passed := passed + 1;
+  end;
+  begin
+    perform public.sync_journal_quest(c, today);
+    failures := failures || 'user called sync_journal_quest';
+  exception when insufficient_privilege then passed := passed + 1;
+  end;
+
+  -- 12. Coach messages are written only by the Edge Function (service role) -------------
+  begin
+    insert into public.coach_messages (user_id, role, content) values (c, 'coach', 'fake reply');
+    failures := failures || 'user inserted a coach message';
+  exception when insufficient_privilege then passed := passed + 1;
+  end;
+
+  -- 13. Push tokens (0008) -----------------------------------------------------------------
+  perform public.register_push_token('ExponentPushToken[rls-check]');
+  begin
+    select count(*) into n from public.push_tokens;
+    failures := failures || 'user can read push tokens';
+  exception when insufficient_privilege then passed := passed + 1;
+  end;
+  begin
+    insert into public.push_tokens (token, user_id) values ('ExponentPushToken[fake]', a);
+    failures := failures || 'user inserted a push token directly';
+  exception when insufficient_privilege then passed := passed + 1;
+  end;
+  begin
+    perform public.register_push_token('not a token');
+    failures := failures || 'registered a malformed token';
+  exception when check_violation then passed := passed + 1;
+  end;
+  -- The same phone signing in as B moves the token to B; C's unregister then does nothing.
+  perform pg_temp.act_as(b);
+  perform public.register_push_token('ExponentPushToken[rls-check]');
+  perform pg_temp.act_as(c);
+  perform public.unregister_push_token('ExponentPushToken[rls-check]');
+  perform pg_temp.act_as_admin();
+  select count(*) into n from public.push_tokens where token = 'ExponentPushToken[rls-check]' and user_id = b;
+  if n = 1 then passed := passed + 1; else failures := failures || 'token did not move to the last sign-in'; end if;
+  perform pg_temp.act_as(b);
+  perform public.unregister_push_token('ExponentPushToken[rls-check]');
+  perform pg_temp.act_as_admin();
+  select count(*) into n from public.push_tokens where token = 'ExponentPushToken[rls-check]';
+  if n = 0 then passed := passed + 1; else failures := failures || 'unregister kept the token'; end if;
+  perform pg_temp.act_as(b);
+  begin
+    update public.cheers set pushed_at = now() where to_user = b;
+    failures := failures || 'user set cheers.pushed_at';
+  exception when insufficient_privilege then passed := passed + 1;
+  end;
+
+  -- 14. App releases (0009): readable when signed in, written only by the developer --------
+  perform pg_temp.act_as(c);
+  begin
+    select count(*) into n from public.app_releases;
+    passed := passed + 1;
+  exception when insufficient_privilege then failures := failures || 'user cannot read app releases';
+  end;
+  begin
+    insert into public.app_releases (runtime_version, apk_url) values ('fake', 'https://evil.test/x.apk');
+    failures := failures || 'user inserted an app release';
+  exception when insufficient_privilege then passed := passed + 1;
+  end;
+
+  -- 15. The day ends at 4 am local time (0010) -----------------------------------
+  if public.respawn_day('UTC', '2026-01-02 03:59Z') = date '2026-01-01'
+    and public.respawn_day('UTC', '2026-01-02 04:00Z') = date '2026-01-02'
+    -- 3:30 am in India is still the evening before.
+    and public.respawn_day('Asia/Kolkata', '2026-01-01 22:00Z') = date '2026-01-01'
+  then passed := passed + 1;
+  else failures := failures || 'respawn_day does not end the day at 4 am';
+  end if;
 
   -- 7. Signed-out (anon) gets nothing ------------------------------------------
   perform pg_temp.act_as_admin();

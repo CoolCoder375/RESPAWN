@@ -6,7 +6,12 @@ import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { Screen } from '@/components/Screen';
 import { TextField } from '@/components/TextField';
-import { useJournal, useSaveJournal, type JournalEntry } from '@/hooks/useJournal';
+import {
+  useJournal,
+  useJournalOnPaper,
+  useSaveJournal,
+  type JournalEntry,
+} from '@/hooks/useJournal';
 import { useLocalDay } from '@/hooks/useLocalDay';
 import { useProfile, type Profile } from '@/hooks/useProfile';
 import { useTodayQuests } from '@/hooks/useQuests';
@@ -47,8 +52,14 @@ function Journal({ profile }: { profile: Profile }) {
 
   return (
     <Screen edges={['bottom']}>
-      {/* Remount at midnight so the editor starts empty for the new day. */}
-      <TodayEntry key={today} profile={profile} today={today} saved={todays?.body ?? ''} />
+      {/* Remount when the day ends (4 am) so the editor starts empty for the new day. */}
+      <TodayEntry
+        key={today}
+        profile={profile}
+        today={today}
+        saved={todays?.body ?? ''}
+        onPaper={todays?.on_paper ?? false}
+      />
 
       <View style={styles.list}>
         <AppText variant="label">Past entries</AppText>
@@ -64,10 +75,21 @@ function Journal({ profile }: { profile: Profile }) {
   );
 }
 
-function TodayEntry({ profile, today, saved }: { profile: Profile; today: string; saved: string }) {
+function TodayEntry({
+  profile,
+  today,
+  saved,
+  onPaper,
+}: {
+  profile: Profile;
+  today: string;
+  saved: string;
+  onPaper: boolean;
+}) {
   const [body, setBody] = useState(saved);
   const quests = useTodayQuests(profile.id, today);
   const save = useSaveJournal(profile.id, today);
+  const paper = useJournalOnPaper(profile.id, today);
 
   const quest = quests.data?.find(isJournalQuest);
   const needed = quest ? linesNeeded(quest.tier) : null;
@@ -80,6 +102,14 @@ function TodayEntry({ profile, today, saved }: { profile: Profile; today: string
         if (needed && lines >= needed) {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
+      },
+    });
+  }
+
+  function togglePaper() {
+    paper.mutate(!onPaper, {
+      onSuccess: () => {
+        if (!onPaper) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       },
     });
   }
@@ -104,13 +134,22 @@ function TodayEntry({ profile, today, saved }: { profile: Profile; today: string
         accessibilityLabel="Today’s journal entry"
       />
       {save.isError ? <AppText color={colors.danger}>{save.error.message}</AppText> : null}
+      {paper.isError ? <AppText color={colors.danger}>{paper.error.message}</AppText> : null}
       <Button title="Save" loading={save.isPending} disabled={!changed} onPress={submit} />
+      <Button
+        title={onPaper ? 'Undo: not in my notebook' : 'I wrote it in my notebook'}
+        variant="ghost"
+        loading={paper.isPending}
+        onPress={togglePaper}
+      />
       <AppText variant="muted">
-        {quest?.done_at
-          ? 'Journal quest done. You can keep editing until midnight.'
-          : needed
-            ? `Write ${needed} ${needed === 1 ? 'line' : 'lines'} and save to complete today’s journal quest. Only you can read this, not even your partner.`
-            : 'Only you can read this, not even your partner.'}
+        {onPaper
+          ? 'Journal quest done on paper. Nothing to type, but you can add a line here too.'
+          : quest?.done_at
+            ? 'Journal quest done. You can keep editing until 4 am.'
+            : needed
+              ? `Write ${needed} ${needed === 1 ? 'line' : 'lines'} and save to complete today’s journal quest. Only you can read this, not even your partner.`
+              : 'Only you can read this, not even your partner.'}
       </AppText>
     </View>
   );
@@ -126,7 +165,8 @@ function PastEntry({ entry }: { entry: JournalEntry }) {
   return (
     <View style={styles.card}>
       <AppText variant="label">{date}</AppText>
-      <AppText style={styles.body}>{entry.body}</AppText>
+      {entry.body ? <AppText style={styles.body}>{entry.body}</AppText> : null}
+      {entry.on_paper ? <AppText variant="muted">Written in my notebook</AppText> : null}
     </View>
   );
 }

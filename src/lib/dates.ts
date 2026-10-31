@@ -1,7 +1,11 @@
-// Dates are handled as local calendar days ("YYYY-MM-DD") in the user's timezone.
+// Dates are handled as local days ("YYYY-MM-DD") in the user's timezone.
 // The client computes "today" and sends it with writes, so the daily reset needs no server cron.
+// A day ends at 4 am, not midnight, so late-night quests still count for the evening before.
 
 export const SEASON_LENGTH = 60;
+
+/** The local hour a new day starts. Mirrors public.respawn_day() (0010_day_ends_at_4am.sql). */
+export const DAY_START_HOUR = 4;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -10,15 +14,16 @@ export function deviceTimezone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 }
 
-/** The local calendar day for `date` in `timezone`, as "YYYY-MM-DD". */
+/** The Respawn day for `date` in `timezone`, as "YYYY-MM-DD": 1 am still belongs to the day before. */
 export function localDay(timezone: string, date: Date = new Date()): string {
+  const shifted = new Date(date.getTime() - DAY_START_HOUR * 60 * 60 * 1000);
   // en-CA formats dates as YYYY-MM-DD.
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: timezone,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  }).format(date);
+  }).format(shifted);
 }
 
 export function isValidDay(day: string): boolean {

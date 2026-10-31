@@ -50,9 +50,21 @@ The insert policy on `task_completions` accepts `day` within one day of the UTC 
 
 An RLS failure gives the generic "violates row-level security policy". A trigger can raise "You've sent 5 cheers today", which the app can show as is. The day boundary uses the sender's timezone.
 
+## The notebook counts as a journal
+
+Some days the journal is on paper. `set_journal_on_paper(day, on_paper)` marks today's entry as written in a notebook, which ticks the journal quest with no text (0007). It's honour-based on purpose: typing a fake line was always possible, so a button is more honest than pushing people to type filler. Both writers call `sync_journal_quest()`, so the tick is computed in one place: on paper, or enough lines.
+
 ## Coach messages are written only by the Edge Function
 
 The app has read-only access to `coach_messages`. The `coach` Edge Function (service role) stores both the user's message and the reply, so the 30/day limit can't be bypassed by writing rows directly.
+
+## Coach: context on the server, nothing saved on failure
+
+- **Context is built in the Edge Function** with the user's own session (so RLS applies): today's quests via `assign_quests()`, Day X and streak from `run_length()`, the last 7 days' RP, and the last 10 messages. The app only sends the text, so a modified app can't feed the coach fake context, and the prompt stays on the server (`supabase/functions/coach/prompt.ts`).
+- **The journal is not sent.** It's private, even from the coach.
+- **Saved only on success:** both messages are inserted after Gemini answers. A failure or the 15 s timeout saves nothing, doesn't count toward the 30/day limit, and the app keeps the typed text.
+- **The limit counts by local day** (`profiles.timezone`), like everything else.
+- **Model is a secret, not code:** `GEMINI_MODEL` can switch models without a redeploy of the app.
 
 ## RLS is tested against the real project
 
@@ -106,7 +118,7 @@ Writing your own tasks let you make the day easy whenever you wanted, so the str
 Journaling was only an optional mind quest that the scoring rarely picked. Since migration 0006, every day has a "Write N lines in your journal" quest (2 RP; 1 / 2 / 3 / 5 lines by tier).
 
 - **Proof, not honour:** `set_quest_done()` refuses the journal quest. `save_journal(day, body)` writes the entry and ticks or unticks the quest from the non-blank line count, so the tick always matches what was written.
-- **Same lock as quests:** users have no write grants on `journal_entries`; today only, with the 10-minute grace after midnight.
+- **Same lock as quests:** users have no write grants on `journal_entries`; today only, with the 10-minute grace after the day ends at 4 am.
 - **Private:** only the author can read an entry, not the partner, unlike quests.
 - **Added in `assign_quests()`, not `build_quests()`:** the journal quest is appended after generation, and it's also added to a day that was generated before 0006, so it appeared on the day it shipped. If the rules had already picked the optional `mind.journal`, that quest is dropped, so a calm-goal day doesn't get two journal quests.
 
@@ -122,3 +134,63 @@ The Duo tab subscribes to Supabase Realtime `postgres_changes` on the partner's 
 ## Android builds via EAS, with the Supabase settings as EAS environment variables
 
 `eas.json` has a `preview` profile that builds an installable APK (internal distribution). The two `EXPO_PUBLIC_*` values come from the EAS `preview` environment (`eas env:create`), not from the gitignored `.env`, which EAS Build never sees. Both values are public by design; the Gemini key will never be one of them.
+
+## Cheer pushes: the sender's app asks, the server checks
+
+A cheer reaches the partner's phone as a push (Expo push service → FCM). After inserting a cheer, the app calls the `notify` Edge Function with its id. The function only pushes a cheer the caller sent, and only once (it claims `cheers.pushed_at`), so the call can't be used to spam. Push tokens live in `push_tokens`, written only through `register_push_token()`; nobody can read them through the API. A database trigger with `pg_net` would push even if the sender's app died mid-send, but it needs a shared secret stored in the database; the client call is simpler, and the cheer still shows in the in-app banner if the push is lost.
+
+## Over-the-air updates
+
+`expo-updates` with the `fingerprint` runtime policy: JavaScript-only changes ship with `eas update --channel preview` and arrive the next time the app opens. A change that touches native code (a new native library, icon, permissions) changes the fingerprint, so it needs a new APK; an old APK never receives an update it can't run.
+
+## Font scaling is capped, not ignored
+
+The app follows the phone's font size, but each text style stops growing at a cap (`maxFontScale` in `src/theme.ts`: 1.15× for the big headings, 1.3× for body text). On phones narrower than 380 dp, headings are also a little smaller. Before this, a phone set to large fonts wrapped "Day 12 of 60" over three lines and pushed the quests off screen.
+
+## Quests in time-of-day clumps
+
+Seven quests in one list looked like a lot on Day 1, even at the easiest tier. The Today screen now groups them into Morning / Anytime / Night (`src/lib/questTimes.ts`, by quest key). Only the clump for the time of day starts open; the others fold to a "2/3 · 5/7 RP" header. The grouping is display-only: the quests, RP and the 50% rule are unchanged.
+
+## Update popups
+
+Two popups, one per kind of update (`src/hooks/useAppUpdates.ts`). A JavaScript update downloads in the background (also checked when the app returns to the foreground), then asks "Restart". A new APK can't arrive over the air, so its runtime version and download link go in `app_releases` after each build. An app whose runtime version isn't the newest one shows "New version of Respawn" with a Download button. Each popup shows once per app launch, and "Later" is always allowed.
+
+
+## Quest reminders are local notifications
+
+The evening reminder (8 pm, phone time) is scheduled on the phone with expo-notifications, not sent
+from the server. It needs no Firebase, cron job or server, and works offline. It's rescheduled each
+time today's quests change, so it carries the real count and is cancelled once nothing is left. Two
+generic reminders for the next days cover days the app isn't opened. Without the exact-alarm
+permission Android may deliver it a few minutes late, which is fine for a reminder.
+
+Push registration errors are shown in Settings → Notifications instead of only being logged, because
+an APK has no visible console.
+
+## A day ends at 4 am
+
+Quests, ticks, the journal, the cheer limit and the coach's daily limit all use a day that runs from
+4 am to 4 am local time (`public.respawn_day()`, mirrored by `localDay()` in `src/lib/dates.ts`).
+With midnight, "Lights out by 1:00 am" could only be ticked before doing it, and by morning the day
+was locked: night quests were done far less often than the rest. Nobody meaningfully starts a new
+day between midnight and 4 am, so 1 am belongs to the evening before. Stored days are unchanged.
+
+## Sleep quests are ticked the next morning
+
+"Lights out by 1:00 am" asked you to pick the phone back up right after putting it away, so it was
+rarely ticked honestly. Sleep quests are now check-ins on the night before ("Slept by 1:00 am last
+night"), in the Morning group. The Night group only has quests you can tick as soon as they're done
+(migration 0011). Quests generated before 0011 keep their titles and stay in Night.
+
+## Coach latency
+
+Gemini replies took 12–16 s in live tests, even with `thinkingLevel: 'low'`. The function now waits
+25 s before answering "offline" (it was 15 s, which a 16 s reply would have missed). The app shows
+"typing…" meanwhile. If replies stay this slow, try a faster model through the `GEMINI_MODEL` secret.
+
+## Cheer banner fades after 8 seconds
+
+The banner used to stay until its close button was tapped, and a dismissal that failed to save
+brought it back on the next refetch (your four cheers were never marked seen, though the same
+update works from a test client). Now it fades after 8 s on screen or on tap, the dismissal retries
+3 times and shows a toast if it still fails, and cheers older than a day never show.

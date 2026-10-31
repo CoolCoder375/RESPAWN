@@ -94,13 +94,15 @@ Each quest has four values, one per tier (Foundation / Build / Push / Master).
 - Yoga: 10 / 15 / 20 / 30 min
 - Sport: 30 / 45 / 60 / 60 min
 - Active rest (Sunday): 20 min stretch or easy walk
-- Extras: stretch for 5 / 10 / 10 / 15 min; a 10 min walk after a meal
+- Extras: stretch before bed for 5 / 10 / 10 / 15 min; a 10 min walk after dinner
 
 **Sleep**
 
-- Lights out by your target. The target starts at the end of your Q2 range and moves 15 minutes earlier each tier, but never earlier than 8 hours before you wake.
+- Slept by your target last night, ticked when you wake up. The target starts at the end of your Q2 range and moves 15 minutes earlier each tier, but never earlier than 8 hours before you wake.
 - Up by your target. It starts at the middle of your Q1 range and moves 15 minutes earlier each tier, never before 5:30 am.
-- No screens for 15 / 30 / 45 / 60 min before bed.
+- No screens for 15 / 30 / 45 / 60 min before bed last night, ticked when you wake up.
+
+The sleep quests are check-ins on the night before (migration 0011): ticking "lights out" at bedtime meant picking the phone back up.
 
 **Mind**
 
@@ -108,6 +110,8 @@ Each quest has four values, one per tier (Foundation / Build / Push / Master).
 - Read 5 / 10 / 15 / 20 pages.
 - Sit quietly: meditation, prayer or jap, 5 / 10 / 15 / 20 min.
 - Plan tomorrow in 3 lines.
+- Slow breathing before bed: 3 / 5 / 5 / 10 min. Ranks higher if stress or mood breaks your streaks.
+- Talk to a friend or someone in your family: a call or a real conversation. Ranks higher if mood breaks your streaks or you never reflect.
 - Phone screen time under 3h / 2.5h / 2h / 1.5h (check it in your phone settings). It's 4h → 2.5h if you're on 5h+ now, and 2h → 1h if you're under 3h.
 
 **Food and body care**
@@ -125,8 +129,9 @@ Each quest has four values, one per tier (Foundation / Build / Push / Master).
 
 - Write 1 / 2 / 3 / 5 lines in your journal. Blank lines don't count.
 - It can't be ticked by hand. Tapping it on Today opens the Journal screen, and saving an entry with enough lines ticks it. Shortening the entry below the target unticks it.
-- Only today's entry can be written (10 minutes' grace after midnight). Past entries are read-only.
+- Only today's entry can be written (the day ends at 4 am, plus 10 minutes' grace). Past entries are read-only.
 - Entries are private. Your partner sees the quest's tick, never the words.
+- Wrote it in a paper notebook instead? "I wrote it in my notebook" on the Journal screen ticks it with no text (migration 0007). Undo unticks it.
 
 ## What changes in the app and database
 
@@ -135,8 +140,15 @@ Each quest has four values, one per tier (Foundation / Build / Push / Master).
   - `quests`: each day's generated quests, with the title, category, RP and whether it's done.
   - Both are read-only for you (RLS). Ticking goes through a function that only lets you tick today's quests.
 - **Generation:** `assign_quests()` works out "today" on the server from your profile's timezone, generates the quests once (with the rules in `build_quests()`), and returns the same quests after that.
-- **Ticking:** `set_quest_done(quest, done)` only works on your own quests for today, with 10 minutes' grace after midnight.
+- **Ticking:** `set_quest_done(quest, done)` only works on your own quests for today, with 10 minutes' grace after the day ends at 4 am.
 - **The run:** `run_length()` scores a day from its quests. Days from before quests existed are still scored from the old daily tasks, so your run carries over. A day with neither (because you never opened the app) counts as a miss.
 - **Today tab:** loses Add, Edit and Delete, and the One-off option goes away. It keeps the RP bar, the 50% marker, Day X and the streak.
 - **Existing tasks:** your current hand-made tasks are archived. Their history stays in the database.
 - **Duo:** your partner will see your quests, read-only (Milestone 5).
+
+## Time of day
+
+The Today screen groups quests into Morning, Anytime and Night (`src/lib/questTimes.ts`). Night
+holds things you can tick as soon as they're done in the evening: walk after dinner, stretch,
+breathing, talking to someone, planning tomorrow and the journal. Morning holds waking up, the
+last-night sleep check-ins, no phone after waking, breakfast and the verse.

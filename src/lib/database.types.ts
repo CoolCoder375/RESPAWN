@@ -14,12 +14,34 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_releases: {
+        Row: {
+          apk_url: string
+          created_at: string
+          notes: string
+          runtime_version: string
+        }
+        Insert: {
+          apk_url: string
+          created_at?: string
+          notes?: string
+          runtime_version: string
+        }
+        Update: {
+          apk_url?: string
+          created_at?: string
+          notes?: string
+          runtime_version?: string
+        }
+        Relationships: []
+      }
       cheers: {
         Row: {
           created_at: string
           from_user: string
           id: string
           message: string
+          pushed_at: string | null
           seen_at: string | null
           to_user: string
         }
@@ -28,6 +50,7 @@ export type Database = {
           from_user?: string
           id?: string
           message: string
+          pushed_at?: string | null
           seen_at?: string | null
           to_user: string
         }
@@ -36,6 +59,7 @@ export type Database = {
           from_user?: string
           id?: string
           message?: string
+          pushed_at?: string | null
           seen_at?: string | null
           to_user?: string
         }
@@ -93,6 +117,7 @@ export type Database = {
           body: string
           created_at: string
           day: string
+          on_paper: boolean
           updated_at: string
           user_id: string
         }
@@ -100,6 +125,7 @@ export type Database = {
           body: string
           created_at?: string
           day: string
+          on_paper?: boolean
           updated_at?: string
           user_id: string
         }
@@ -107,6 +133,7 @@ export type Database = {
           body?: string
           created_at?: string
           day?: string
+          on_paper?: boolean
           updated_at?: string
           user_id?: string
         }
@@ -232,6 +259,32 @@ export type Database = {
             columns: ["pair_id"]
             isOneToOne: false
             referencedRelation: "pairs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      push_tokens: {
+        Row: {
+          token: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          token: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          token?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_tokens_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -403,6 +456,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      assert_journal_day: {
+        Args: { day: string; uid: string }
+        Returns: undefined
+      }
       assign_quests: {
         Args: never
         Returns: {
@@ -489,6 +546,8 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      register_push_token: { Args: { token: string }; Returns: undefined }
+      respawn_day: { Args: { at?: string; tz: string }; Returns: string }
       run_length: { Args: { target: string; through: string }; Returns: number }
       save_journal: {
         Args: { body: string; day: string }
@@ -496,6 +555,24 @@ export type Database = {
           body: string
           created_at: string
           day: string
+          on_paper: boolean
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "journal_entries"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_journal_on_paper: {
+        Args: { day: string; on_paper: boolean }
+        Returns: {
+          body: string
+          created_at: string
+          day: string
+          on_paper: boolean
           updated_at: string
           user_id: string
         }
@@ -511,7 +588,12 @@ export type Database = {
         Returns: undefined
       }
       submit_questionnaire: { Args: { answers: Json }; Returns: undefined }
+      sync_journal_quest: {
+        Args: { day: string; uid: string }
+        Returns: undefined
+      }
       unpair: { Args: never; Returns: undefined }
+      unregister_push_token: { Args: { token: string }; Returns: undefined }
     }
     Enums: {
       [_ in never]: never

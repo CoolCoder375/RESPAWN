@@ -41,5 +41,21 @@ export const radius = {
   pill: 999,
 } as const;
 
+/**
+ * Largest system font scale each text style follows. Above it, text stops growing so a phone
+ * set to "huge" fonts doesn't wrap every heading and push the quests off screen.
+ */
+export const maxFontScale = {
+  display: 1.15,
+  title: 1.2,
+  body: 1.3,
+  label: 1.3,
+  muted: 1.3,
+  input: 1.3,
+} as const;
+
+/** Phones narrower than this (dp) get slightly smaller headings. */
+export const narrowScreen = 380;
+
 /** Minimum touch target, per the plan (44 px). */
 export const touch = 48;

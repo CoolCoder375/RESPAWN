@@ -16,9 +16,11 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { ToastProvider } from '@/components/Toast';
+import { useAppUpdates } from '@/hooks/useAppUpdates';
 import { useProfile } from '@/hooks/useProfile';
 import { useHasAnswered } from '@/hooks/useQuestionnaire';
 import { AuthProvider, useAuth } from '@/lib/auth';
+import { usePushNotifications } from '@/lib/notifications';
 import { colors, fonts, space } from '@/theme';
 
 SplashScreen.preventAutoHideAsync();
@@ -67,6 +69,8 @@ function AuthGate() {
   const hasProfile = !!profile.data;
   const loading = !ready || (signedIn && profile.isPending) || (hasProfile && answered.isPending);
   const hasAnswered = !!answered.data;
+  usePushNotifications(signedIn && hasProfile && hasAnswered);
+  useAppUpdates(signedIn && hasProfile && hasAnswered);
 
   useEffect(() => {
     if (!loading) SplashScreen.hideAsync();

@@ -1,15 +1,32 @@
-import { StyleSheet, Text, type TextProps } from 'react-native';
+import { StyleSheet, Text, useWindowDimensions, type TextProps } from 'react-native';
 
-import { colors, fonts } from '@/theme';
+import { colors, fonts, maxFontScale, narrowScreen } from '@/theme';
 
 type Variant = 'display' | 'title' | 'body' | 'label' | 'muted';
 
 type Props = TextProps & { variant?: Variant; color?: string };
 
-/** Text with the app fonts applied. Font scaling follows the system setting. */
+/**
+ * Text with the app fonts applied. Font scaling follows the system setting, up to a cap per
+ * variant, so big system fonts stay readable without breaking layouts. Headings also shrink a
+ * little on narrow phones.
+ */
 export function AppText({ variant = 'body', color, style, ...rest }: Props) {
-  return <Text style={[styles[variant], color ? { color } : null, style]} {...rest} />;
+  const { width } = useWindowDimensions();
+  const narrow = width < narrowScreen && (variant === 'display' || variant === 'title');
+  return (
+    <Text
+      maxFontSizeMultiplier={maxFontScale[variant]}
+      style={[styles[variant], narrow && narrowStyles[variant], color ? { color } : null, style]}
+      {...rest}
+    />
+  );
 }
+
+const narrowStyles: Partial<Record<Variant, object>> = {
+  display: { fontSize: 26, lineHeight: 32 },
+  title: { fontSize: 17, lineHeight: 22 },
+};
 
 const styles = StyleSheet.create({
   display: { fontFamily: fonts.display, fontSize: 30, lineHeight: 38, color: colors.text },

@@ -40,3 +40,22 @@ export function useSaveJournal(userId: string, today: string) {
       ]),
   });
 }
+
+/** "I wrote it in my notebook": completes the journal quest without typing it out. */
+export function useJournalOnPaper(userId: string, today: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (onPaper: boolean) => {
+      const { error } = await supabase.rpc('set_journal_on_paper', {
+        day: today,
+        on_paper: onPaper,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: journalKey(userId) }),
+        queryClient.invalidateQueries({ queryKey: questsKey(userId, today) }),
+      ]),
+  });
+}

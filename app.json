@@ -17,7 +17,8 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.coolcoder375.respawn"
+      "package": "com.coolcoder375.respawn",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -35,12 +36,32 @@
           "resizeMode": "contain",
           "backgroundColor": "#0D0E11"
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/android-icon-monochrome.png",
+          "color": "#C8F04A"
+        }
       ]
     ],
     "scheme": "respawn",
     "backgroundColor": "#0D0E11",
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "de4262d4-b145-46af-8d6f-829f9c805596"
+      }
+    },
+    "owner": "respawn_2103",
+    "updates": {
+      "url": "https://u.expo.dev/de4262d4-b145-46af-8d6f-829f9c805596"
+    },
+    "runtimeVersion": {
+      "policy": "fingerprint"
     }
   }
 }

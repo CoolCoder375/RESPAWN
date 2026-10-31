@@ -1,6 +1,6 @@
 import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 
-import { colors, fonts, radius, space, touch } from '@/theme';
+import { colors, fonts, maxFontScale, radius, space, touch } from '@/theme';
 import { AppText } from './AppText';
 
 type Props = TextInputProps & { label?: string; error?: string | null };
@@ -13,6 +13,7 @@ export function TextField({ label, error, style, ...rest }: Props) {
         placeholderTextColor={colors.muted}
         selectionColor={colors.accent}
         keyboardAppearance="dark"
+        maxFontSizeMultiplier={maxFontScale.input}
         style={[styles.input, error ? styles.inputError : null, style]}
         {...rest}
       />

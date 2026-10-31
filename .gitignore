@@ -46,3 +46,7 @@ yarn-error.*
 # supabase local
 supabase/.temp/
 supabase/.branches/
+
+# Firebase service account keys (secret). google-services.json is public and committed.
+*firebase-adminsdk*.json
+service-account*.json

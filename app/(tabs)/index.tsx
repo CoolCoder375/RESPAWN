@@ -1,12 +1,14 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import { ActivityIndicator, LayoutAnimation, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { CheerBanner } from '@/components/CheerBanner';
 import { ProgressBar } from '@/components/ProgressBar';
+import { QuestGroup } from '@/components/QuestGroup';
 import { QuestRow } from '@/components/QuestRow';
 import { Screen } from '@/components/Screen';
 import { useLocalDay } from '@/hooks/useLocalDay';
@@ -22,6 +24,14 @@ import {
 import { SEASON_LENGTH } from '@/lib/dates';
 import { isJournalQuest } from '@/lib/journal';
 import type { DayScore } from '@/lib/points';
+import { useQuestReminders } from '@/lib/reminders';
+import {
+  currentQuestTime,
+  localHour,
+  QUEST_TIMES,
+  questTime,
+  type QuestTime,
+} from '@/lib/questTimes';
 import { colors, fonts, space } from '@/theme';
 
 const TIERS = ['Foundation', 'Build', 'Push', 'Master'];
@@ -40,6 +50,7 @@ function Today({ profile }: { profile: Profile }) {
   const pastRun = useRunThroughYesterday(userId, today);
   const tick = useTickQuest(userId, today);
   const partner = usePartner(profile);
+  useQuestReminders(questsQuery.data);
 
   if (questsQuery.isPending) {
     return (
@@ -103,13 +114,19 @@ function Today({ profile }: { profile: Profile }) {
           <AppText variant="label">Today’s quests</AppText>
           {tier ? <AppText variant="label">{TIERS[tier - 1]} tier</AppText> : null}
         </View>
-        {quests.map((quest) =>
-          isJournalQuest(quest) ? (
-            <QuestRow key={quest.id} quest={quest} onOpen={() => router.push('/journal')} />
-          ) : (
-            <QuestRow key={quest.id} quest={quest} onToggle={() => toggle(quest)} />
-          ),
-        )}
+        {/* Remount each day so the clump for the time of day opens again. */}
+        <QuestClumps
+          key={today}
+          quests={quests}
+          timezone={profile.timezone}
+          renderQuest={(quest) =>
+            isJournalQuest(quest) ? (
+              <QuestRow key={quest.id} quest={quest} onOpen={() => router.push('/journal')} />
+            ) : (
+              <QuestRow key={quest.id} quest={quest} onToggle={() => toggle(quest)} />
+            )
+          }
+        />
       </View>
 
       <View style={styles.note}>
@@ -121,6 +138,54 @@ function Today({ profile }: { profile: Profile }) {
       </View>
     </Screen>
   );
+}
+
+/**
+ * Quests in Morning / Anytime / Night clumps. The clump for the time of day starts open (or the
+ * next one with something left to do); the rest stay folded until tapped.
+ */
+function QuestClumps({
+  quests,
+  timezone,
+  renderQuest,
+}: {
+  quests: Quest[];
+  timezone: string;
+  renderQuest: (quest: Quest) => ReactNode;
+}) {
+  const groups = QUEST_TIMES.map((time) => ({
+    time,
+    quests: quests.filter((q) => questTime(q) === time),
+  })).filter((g) => g.quests.length > 0);
+
+  const [open, setOpen] = useState<Set<QuestTime>>(() => {
+    const now = QUEST_TIMES.indexOf(currentQuestTime(localHour(timezone)));
+    const pending = groups.filter((g) => g.quests.some((q) => !q.done_at));
+    const first = pending.find((g) => QUEST_TIMES.indexOf(g.time) >= now) ?? pending[0] ?? null;
+    return new Set(first ? [first.time] : []);
+  });
+
+  function toggleGroup(time: QuestTime) {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setOpen((current) => {
+      const next = new Set(current);
+      if (next.has(time)) next.delete(time);
+      else next.add(time);
+      return next;
+    });
+  }
+
+  return groups.map((group) => (
+    <QuestGroup
+      key={group.time}
+      time={group.time}
+      quests={group.quests}
+      open={open.has(group.time)}
+      onToggle={() => toggleGroup(group.time)}
+    >
+      {group.quests.map(renderQuest)}
+    </QuestGroup>
+  ));
 }
 
 function statusLine(score: DayScore, runDay: number): string {
